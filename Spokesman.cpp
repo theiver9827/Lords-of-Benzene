@@ -1,7 +1,10 @@
-#include <unistd.h>
 #include <dirent.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <string>
+#include <iostream>
+#include <fstream>
+#include <stdio.h>
 
 #include "Spokesman.h"
 
@@ -13,30 +16,27 @@
  *
 **/
 
+void Spokesman::PrintInvitation()
+{
+    std::cout << "Welcome, User! Choose one of the options below:\n";
+    std::cout << "1. Process several images\n";
+    std::cout << "2. Process images in directory\n";
+    std::cout << "3. Train our system on your samples\n";
+    std::cout << "4. Test the work of our system on basic sets of examples\n";
+    std::cout << "5. Quit\n";
+}
+
 UseMode_t Spokesman::InteractWithUser()
 {
-    printf ("Welcome, User! Choose one of the options below:\n");
-    printf ("1. Process several images\n");
-    printf ("2. Train our system on your samples\n");
-    printf ("3. Test the work of our system on basic sets of examples\n");
-    printf ("4. Quit");
 
+    PrintInvitation();
     char option = 0;
 
-    while ( (option = getchar() - '1') > 4 || option < 0) {
-        printf ("ERROR! Wrong option:\"%c\" Maybe mistyped?\n", option);
-        sleep (2);
-        rewind (stdout);
-        ftruncate (1, 0);
-
-        printf ("Welcome, User! Choose one of the options below:\n");
-        printf ("1. Process several images\n");
-        printf ("2. Process images in directory\n");
-        printf ("3. Train our system on your samples\n");
-        printf ("4. Test the work of our system on basic sets of examples\n");
-        printf ("5. Quit");
+    while (std::cin >> option && !(option <= '5' && option >= '1')) {
+        std::cout << "ERROR! Wrong option: " << option << " Maybe mistyped?\n";
+        PrintInvitation();
     }
-
+    option -= '1';
     switch (option) {
         case 0:
             return UM_INPUT_IMAGE;
@@ -51,89 +51,81 @@ UseMode_t Spokesman::InteractWithUser()
             return UM_TEST_SAMPLES;
             break;
         case 4:
-            printf ("What a pity that you have finally finished your work...\n");
-            sleep (3);
+            std::cout << "What a pity that you have finally finished your work...\n";
             return UM_IM_QUIT;
             break;
     }
 }
 
-void Spokesman::Err (const char *error_text)
+void Spokesman::Err(std::string error_text)
 {
-    printf ("ERROR! \"%s\"\n", error_text);
-    sleep (3);
-
-}
-void Spokesman::Msg (const char *msg_text)
-{
-    printf ("MSG: %s\n", msg_text);
-    sleep (3);
+    std::cout << "Error occurred: " << error_text << "\n";
 }
 
-bool Spokesman::ShowImages (vector <Image_t> what_to_show)
+void Spokesman::Msg(std::string msg_text)
+{
+    std::cout << "Msg: " << msg_text << "\n";
+}
+
+bool Spokesman::ShowImages(std::vector<Image_t> what_to_show)
 {
     for (int i = 0; i < what_to_show.size(); i++) {
         //Displaying images
     }
 }
 
-vector<Image_t> Spokesman::InputImages (UseMode_t given_mode)
+std::vector<Image_t> Spokesman::InputImages(UseMode_t given_mode)
 {
-    char path[PATH_MAX];
-    printf ("Enter image path: ");
+    string path;
+    std::cout << "Enter image path: \n";
     Image_t new_elem;
 
-    vector<Image_t> samples_vec;
-    samples_vec.reserve(10);
-
-    while (!scanf("%[^\n]\n", path)) {
-        new_elem.image = cv::imread (path, CV_LOAD_IMAGE_UNCHANGED);
-        new_elem.info = SI_UNDEF;
-        samples_vec.push_back(new_elem);
-
-        printf ("Enter image path: ");
-    }
-
+    std::vector<Image_t> samples_vec;
+    std::cin >> path;
+    std::cout << path << " AZAZA\n";
+    new_elem.image = cv::imread(path, CV_LOAD_IMAGE_GRAYSCALE);
+    new_elem.info = SI_UNDEF;
+    samples_vec.push_back(new_elem);
     return samples_vec;
 }
 
-vector <Image_t> Spokesman::InputDir (UseMode_t given_mode)
+std::vector <Image_t> Spokesman::InputDir(UseMode_t given_mode)
 {
-    char path_to_dir[PATH_MAX];
-    printf ("Enter path to dir: ");
-    scanf ("%[^\n]\n", path_to_dir);
+    std::string path_to_dir;
+    std::cout << "Enter path to dir: \n";
+    std::cin >> path_to_dir;
 
-    vector <Image_t> samples_vec;
-    samples_vec.reserve(10);
-
-    DIR* directory = opendir (path_to_dir);
-    char path[PATH_MAX] = {};
+    std::vector<Image_t> samples_vec;
+    DIR* directory = opendir(path_to_dir.c_str());
+    std::string path = "";
     struct dirent *dd = NULL;
     struct stat stb;
 
     Image_t new_elem;
     if (given_mode == UM_INPUT_DIR) {
         while ((dd = readdir(directory)) != NULL) {
-            snprintf (path, sizeof(path), "%s/%s", path_to_dir, dd->d_name);
-            if ( (lstat (path, &stb) != -1) && S_ISREG(stb.st_mode)) {
-                new_elem.image = cv::imread (path, CV_LOAD_IMAGE_UNCHANGED);
+            path = path_to_dir + '/' + dd->d_name;
+            if ( (lstat (path.c_str(), &stb) != -1) && S_ISREG(stb.st_mode)) {
+                std::cout << "AZAZA LALKI\n";
+                new_elem.image = cv::imread(path, CV_LOAD_IMAGE_GRAYSCALE);
                 new_elem.info = SI_UNDEF;
                 samples_vec.push_back(new_elem);
             }
         }
     } else if (given_mode == UM_TRAIN_ON_NEW || given_mode == UM_TEST_SAMPLES) {
-        snprintf(path, sizeof (path), "%s/%s.dat", path_to_dir, path_to_dir);
-        if (!fopen (path)) {
+        path = path_to_dir + '/' + dd->d_name + ".dat";
+        std::ifstream fin(path.c_str());
+        if (!fin.is_open()) {
             samples_vec.clear();
             return samples_vec;
         }
-        FILE *input_data = fopen (path, "r");
-        while(!feof (input_data)) {
-            fscanf(input_data, "%s %d\n", path, &(new_elem.info));
-            new_elem.image = cv::imread(path, CV_LOAD_IMAGE_UNCHANGED);
+        std::string impath;
+        while(fin >> impath >> new_elem.info) {
+            impath = path + '/' + impath;
+            new_elem.image = cv::imread(impath, CV_LOAD_IMAGE_GRAYSCALE);
             samples_vec.push_back(new_elem);
         }
-        fclose (input_data);
+        fin.close();
         return samples_vec;
     }
 }
